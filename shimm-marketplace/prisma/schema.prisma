@@ -1,0 +1,714 @@
+// Shimm Marketplace — schema aligned with ShimmBot ТЗ + skillet domain comments.
+// Rule: never mutate balances without ledger journal + lines (enforced in services).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USERS ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  frozen
+  banned
+  deleted
+}
+
+enum FraudReputationLabel {
+  clean
+  suspicious
+  warned
+  scam_reports_present
+  restricted
+  banned_for_fraud
+}
+
+model User {
+  id                String     @id @default(cuid())
+  telegramUserId    BigInt     @unique @map("telegram_user_id")
+  username          String?
+  firstName         String?    @map("first_name")
+  lastName          String?    @map("last_name")
+  languageCode      String?    @map("language_code")
+  region            String?
+  status            UserStatus @default(active)
+  kycLevel          Int        @default(0) @map("kyc_level")
+  trustScore        Decimal    @default(0) @map("trust_score") @db.Decimal(12, 4)
+  riskScore         Decimal    @default(0) @map("risk_score") @db.Decimal(12, 4)
+  fraudLabel        FraudReputationLabel @default(clean) @map("fraud_label")
+  fraudReportCount  Int        @default(0) @map("fraud_report_count")
+  confirmedFraudCount Int      @default(0) @map("confirmed_fraud_count")
+  abuseReportsFalse Int        @default(0) @map("abuse_reports_false")
+  lastSeenAt        DateTime?  @map("last_seen_at")
+  isSeller          Boolean    @default(false) @map("is_seller")
+  isGuarantor       Boolean    @default(false) @map("is_guarantor")
+  isAdmin           Boolean    @default(false) @map("is_admin")
+  isModerator       Boolean    @default(false) @map("is_moderator")
+  canCreateOrders   Boolean    @default(true) @map("can_create_orders")
+  canAcceptOrders   Boolean    @default(true) @map("can_accept_orders")
+  canJoinSecretChats Boolean   @default(true) @map("can_join_secret_chats")
+  sellerNotAcceptingRequests Boolean @default(false) @map("seller_not_accepting_requests")
+  ignoredRequestsCount Int     @default(0) @map("ignored_requests_count")
+  responseRatePercent Decimal? @map("response_rate_percent") @db.Decimal(5, 2)
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  profile           Profile?
+  roles             UserRole[]
+  wallets           Wallet[]
+  dealsAsClient     Deal[]     @relation("DealClient")
+  dealsAsSeller     Deal[]     @relation("DealSeller")
+  applicationsSent  DealApplication[] @relation("ApplicationClient")
+  applicationsRecv  DealApplication[] @relation("ApplicationSeller")
+  onboardingSessions OnboardingSession[]
+  adminUser         AdminUser?
+  robloxVerifications RobloxVerification[]
+  listings          Listing[]
+  withdrawals       Withdrawal[]
+}
+
+// ─── ROLES ───────────────────────────────────────────────────────────────────
+
+enum SystemRole {
+  owner
+  admin
+  moderator
+  support
+}
+
+model UserRole {
+  id        String     @id @default(cuid())
+  userId    String     @map("user_id")
+  role      SystemRole
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([userId])
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── PROFILES ────────────────────────────────────────────────────────────────
+
+model Profile {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  bio         String?
+  robloxUserId String? @map("roblox_user_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── ROBLOX VERIFICATION (stub domain for future flows) ─────────────────────
+
+model RobloxVerification {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  robloxUserId String    @map("roblox_user_id")
+  verifiedAt   DateTime? @map("verified_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── DEALS ───────────────────────────────────────────────────────────────────
+
+enum DealState {
+  created
+  pending_seller_review
+  seller_accepted
+  seller_declined
+  secret_chat_created
+  waiting_participants_join
+  active
+  guarantor_requested
+  guarantor_invited
+  guarantor_joined
+  scam_reported
+  admin_review
+  disputed
+  completion_requested
+  completion_confirmed_by_client
+  completion_confirmed_partial
+  completion_confirmed_full
+  feedback_phase
+  close_requested
+  closed
+  force_closed
+  archived
+}
+
+model Deal {
+  id          String     @id @default(cuid())
+  state       DealState  @default(created)
+  clientId    String     @map("client_id")
+  sellerId    String     @map("seller_id")
+  guarantorId String?    @map("guarantor_id")
+  title       String
+  category    String?
+  budgetMinor BigInt     @default(0) @map("budget_minor")
+  currency    String     @default("SHIMM")
+  needsGuarantor Boolean @default(false) @map("needs_guarantor")
+  metadata    Json?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  client    User @relation("DealClient", fields: [clientId], references: [id])
+  seller    User @relation("DealSeller", fields: [sellerId], references: [id])
+  chat      DealChat?
+  events    DealEvent[]
+  applications DealApplication[]
+}
+
+model DealEvent {
+  id        String   @id @default(cuid())
+  dealId    String   @map("deal_id")
+  actorId   String?  @map("actor_id")
+  type      String
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId, createdAt])
+}
+
+// ─── DEAL ROOMS / CHATS ──────────────────────────────────────────────────────
+
+model DealChat {
+  id              String    @id @default(cuid())
+  dealId          String    @unique @map("deal_id")
+  telegramChatId  BigInt?   @map("telegram_chat_id")
+  joinWindowEndsAt DateTime? @map("join_window_ends_at")
+  destroyedAt     DateTime? @map("destroyed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  invites DealInvite[]
+}
+
+model DealInvite {
+  id         String    @id @default(cuid())
+  dealChatId String    @map("deal_chat_id")
+  role       String
+  inviteLink String    @map("invite_link")
+  nonce      String    @unique
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  chat DealChat @relation(fields: [dealChatId], references: [id], onDelete: Cascade)
+
+  @@index([dealChatId])
+}
+
+// ─── APPLICATIONS (client → seller request before deal room) ─────────────────
+
+enum ApplicationStatus {
+  new
+  pending_seller
+  accepted
+  declined
+  no_longer_relevant
+  expired
+  disputed
+}
+
+model DealApplication {
+  id          String             @id @default(cuid())
+  dealId      String?            @map("deal_id")
+  clientId    String             @map("client_id")
+  sellerId    String             @map("seller_id")
+  status      ApplicationStatus  @default(new)
+  title       String
+  description String?
+  budgetMinor BigInt             @default(0) @map("budget_minor")
+  deadlineAt  DateTime?          @map("deadline_at")
+  needsGuarantor Boolean         @default(false) @map("needs_guarantor")
+  sellerRespondedAt DateTime?    @map("seller_responded_at")
+  notifyOnResponse Boolean       @default(false) @map("notify_on_response")
+  idempotencyKey String?         @unique @map("idempotency_key")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  client User @relation("ApplicationClient", fields: [clientId], references: [id])
+  seller User @relation("ApplicationSeller", fields: [sellerId], references: [id])
+  deal   Deal? @relation(fields: [dealId], references: [id])
+
+  @@index([sellerId, status])
+  @@index([clientId, status])
+}
+
+// ─── REVIEWS ─────────────────────────────────────────────────────────────────
+
+model Review {
+  id         String   @id @default(cuid())
+  dealId     String   @map("deal_id")
+  authorId   String   @map("author_id")
+  targetId   String   @map("target_id")
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([dealId])
+  @@index([targetId])
+}
+
+// ─── WALLET / LEDGER (double-entry) ───────────────────────────────────────────
+
+enum LedgerAccountKind {
+  user_available
+  user_reserved
+  user_bonus
+  system_revenue
+  system_fee
+  escrow
+  dispute_hold
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  currency  String   @default("SHIMM")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts LedgerAccount[]
+
+  @@unique([userId, currency])
+}
+
+model LedgerAccount {
+  id        String             @id @default(cuid())
+  walletId  String             @map("wallet_id")
+  kind      LedgerAccountKind
+  createdAt DateTime           @default(now()) @map("created_at")
+
+  wallet Wallet       @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  lines  LedgerLine[]
+
+  @@unique([walletId, kind])
+}
+
+enum LedgerLineSide {
+  debit
+  credit
+}
+
+model LedgerJournal {
+  id             String   @id @default(cuid())
+  idempotencyKey String   @unique @map("idempotency_key")
+  reason         String
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  lines LedgerLine[]
+}
+
+model LedgerLine {
+  id        String         @id @default(cuid())
+  journalId String         @map("journal_id")
+  accountId String         @map("account_id")
+  side      LedgerLineSide
+  amountMinor BigInt       @map("amount_minor")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  journal LedgerJournal @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  account LedgerAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId])
+  @@index([journalId])
+}
+
+// ─── WITHDRAWALS / DEPOSITS (stubs) ──────────────────────────────────────────
+
+enum WithdrawalStatus {
+  pending
+  processing
+  completed
+  failed
+  cancelled
+}
+
+model Withdrawal {
+  id             String           @id @default(cuid())
+  userId         String           @map("user_id")
+  amountMinor    BigInt           @map("amount_minor")
+  status         WithdrawalStatus @default(pending)
+  idempotencyKey String           @unique @map("idempotency_key")
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+// ─── MARKET / LISTINGS (minimal) ─────────────────────────────────────────────
+
+enum GameSlug {
+  dragon_adventures
+  creatures_of_sonaria
+}
+
+model Listing {
+  id          String   @id @default(cuid())
+  sellerId    String   @map("seller_id")
+  game        GameSlug
+  title       String
+  description String?
+  priceMinor  BigInt   @map("price_minor")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  seller User @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  @@index([sellerId, game])
+}
+
+// ─── SEARCH (stub: denormalized tags) ────────────────────────────────────────
+
+model ListingSearchDocument {
+  listingId String @id @map("listing_id")
+  body      String
+}
+
+// ─── BROADCAST / VIP / ADS / REFERRALS / ACHIEVEMENTS / PROMO (flags + stubs) ─
+
+model VipSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+}
+
+model AdCampaign {
+  id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
+  title     String
+  active    Boolean  @default(true)
+  endsAt    DateTime @map("ends_at")
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+model ReferralCode {
+  id        String @id @default(cuid())
+  code      String @unique
+  ownerId   String @map("owner_id")
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique
+  title       String
+  description String?
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  achievementId String   @map("achievement_id")
+  grantedAt     DateTime @default(now()) @map("granted_at")
+  idempotencyKey String? @unique @map("idempotency_key")
+
+  @@unique([userId, achievementId])
+}
+
+model PromoCode {
+  id         String    @id @default(cuid())
+  code       String    @unique
+  maxUses    Int       @default(1) @map("max_uses")
+  usedCount  Int       @default(0) @map("used_count")
+  expiresAt  DateTime? @map("expires_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+}
+
+// ─── NOTIFICATIONS / SUPPORT ─────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  channel   String
+  payload   Json
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+}
+
+enum SupportTicketStatus {
+  open
+  pending
+  closed
+}
+
+model SupportTicket {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  subject   String
+  status    SupportTicketStatus @default(open)
+  createdAt DateTime            @default(now()) @map("created_at")
+}
+
+// ─── ONBOARDING (Блок 30 / сжатый блок для Cursor) ───────────────────────────
+
+model OnboardingSession {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  flowVersion     Int       @map("flow_version")
+  policyVersionId String?   @map("policy_version_id")
+  currentStepKey  String?   @map("current_step_key")
+  ipHash          String?   @map("ip_hash")
+  lastActivityAt  DateTime? @map("last_activity_at")
+  expiresAt       DateTime? @map("expires_at")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  steps OnboardingStep[]
+
+  @@index([userId, completedAt])
+}
+
+model OnboardingStep {
+  id           String   @id @default(cuid())
+  sessionId    String   @map("session_id")
+  stepKey      String   @map("step_key")
+  answerGiven  String?  @map("answer_given")
+  isCorrect    Boolean? @map("is_correct")
+  isMandatory  Boolean  @default(true) @map("is_mandatory")
+  completedAt  DateTime? @map("completed_at")
+
+  session OnboardingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model OnboardingReward {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  idempotencyKey String   @unique @map("idempotency_key")
+  amountMinor    BigInt   @map("amount_minor")
+  createdAt      DateTime @default(now()) @map("created_at")
+}
+
+model OnboardingAuditLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  event     String
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt])
+}
+
+model ContextualOnboardingTip {
+  id         String @id @default(cuid())
+  actionKey  String @unique @map("action_key")
+  tipText    String @map("tip_text")
+}
+
+model OnboardingContextualShown {
+  id        String @id @default(cuid())
+  userId    String @map("user_id")
+  actionKey String @map("action_key")
+
+  @@unique([userId, actionKey])
+}
+
+// ─── TESTS SYSTEM (stub) ─────────────────────────────────────────────────────
+
+model UserTestAttempt {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  testKey   String   @map("test_key")
+  score     Int?
+  passed    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+}
+
+// ─── LEGAL / RULES ───────────────────────────────────────────────────────────
+
+model LegalAcceptance {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  documentKey   String   @map("document_key")
+  policyVersion String   @map("policy_version")
+  acceptedAt    DateTime @default(now()) @map("accepted_at")
+
+  @@unique([userId, documentKey, policyVersion])
+}
+
+// ─── SETTINGS ──────────────────────────────────────────────────────────────────
+
+model PlatformUiSettings {
+  id           Int      @id @default(1)
+  onboardingFlowVersion Int @default(1) @map("onboarding_flow_version")
+  maintenanceMode     Boolean @default(false) @map("maintenance_mode")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+}
+
+// ─── RATE LIMITS / CALLBACK SECURITY ────────────────────────────────────────
+
+model ProcessedTelegramUpdate {
+  id         String   @id @default(cuid())
+  botKind    String   @map("bot_kind")
+  updateId   BigInt   @map("update_id")
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@unique([botKind, updateId])
+}
+
+model CallbackNonce {
+  id        String   @id @default(cuid())
+  nonce     String   @unique
+  userId    String?  @map("user_id")
+  payload   String
+  expiresAt DateTime @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime @default(now()) @map("created_at")
+}
+
+// ─── LOGS / ARCHIVES / FRAUD ─────────────────────────────────────────────────
+
+model FraudReport {
+  id          String   @id @default(cuid())
+  dealId      String   @map("deal_id")
+  reporterId  String   @map("reporter_id")
+  accusedId   String   @map("accused_id")
+  description String
+  status      String   @default("open")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([dealId])
+}
+
+model ArchiveRecord {
+  id         String   @id @default(cuid())
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  storageRef String   @map("storage_ref")
+  createdAt  DateTime @default(now()) @map("created_at")
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String?  @map("admin_id")
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+}
+
+// ─── ADMIN BOT / INFRA (Блок 31) ───────────────────────────────────────────────
+
+model Deployment {
+  id               String    @id @default(cuid())
+  environment      String
+  version          String
+  commitHash       String?   @map("commit_hash")
+  migrationVersion String?   @map("migration_version")
+  deployedBy       String?   @map("deployed_by")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  status           String
+  rollbackVersion  String?   @map("rollback_version")
+}
+
+model FeatureFlag {
+  id               String    @id @default(cuid())
+  flagKey          String    @map("flag_key")
+  environment      String
+  enabled          Boolean   @default(false)
+  rolloutPercent   Int       @default(0) @map("rollout_percent")
+  conditionsJson   Json?     @map("conditions_json")
+  enabledByAdminId String?   @map("enabled_by_admin_id")
+  expiresAt        DateTime? @map("expires_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@unique([flagKey, environment])
+}
+
+model Incident {
+  id                   String    @id @default(cuid())
+  severity             String
+  title                String
+  status               String
+  startedAt            DateTime  @default(now()) @map("started_at")
+  resolvedAt           DateTime? @map("resolved_at")
+  ownerAdminId         String?   @map("owner_admin_id")
+  summary              String?
+  postmortemUrl        String?   @map("postmortem_url")
+  affectedServicesJson Json?     @map("affected_services_json")
+}
+
+model IncidentEvent {
+  id          String   @id @default(cuid())
+  incidentId  String   @map("incident_id")
+  actorId     String?  @map("actor_id")
+  eventType   String   @map("event_type")
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([incidentId])
+}
+
+model SystemHealthCheck {
+  id          String   @id @default(cuid())
+  serviceName String   @map("service_name")
+  status      String
+  latencyMs   Int?     @map("latency_ms")
+  checkedAt   DateTime @default(now()) @map("checked_at")
+  metadataJson Json?   @map("metadata_json")
+}
+
+model BackupJob {
+  id                String    @id @default(cuid())
+  backupType        String    @map("backup_type")
+  environment       String
+  status            String
+  startedAt         DateTime  @default(now()) @map("started_at")
+  completedAt       DateTime? @map("completed_at")
+  storageRef        String?   @map("storage_ref")
+  checksum          String?
+  checksumVerified  Boolean   @default(false) @map("checksum_verified")
+  verifiedAt        DateTime? @map("verified_at")
+}
+
+model InfrastructureAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?  @map("actor_id")
+  action    String
+  service   String
+  oldValue  String?  @map("old_value")
+  newValue  String?  @map("new_value")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+}

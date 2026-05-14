@@ -1,0 +1,534 @@
+shimm-marketplace/
+├── README.md
+├── LICENSE
+├── .gitignore
+├── .env.example
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── Makefile
+├── package.json
+├── pnpm-workspace.yaml
+├── turbo.json
+├── tsconfig.base.json
+│
+├── apps/
+│   ├── client-bot/
+│   ├── admin-bot/
+│   ├── deal-room-bot/
+│   ├── mini-app/
+│   └── api/
+│
+├── packages/
+│   ├── core/
+│   ├── database/
+│   ├── config/
+│   ├── logger/
+│   ├── i18n/
+│   ├── security/
+│   ├── telegram/
+│   ├── notifications/
+│   ├── payments/
+│   ├── antifraud/
+│   ├── permissions/
+│   ├── ui-kit/
+│   └── shared-types/
+│
+├── services/
+│   ├── workers/
+│   ├── scheduler/
+│   ├── webhook-gateway/
+│   └── file-exporter/
+│
+├── prisma/
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed/
+│
+├── infra/
+│   ├── docker/
+│   ├── nginx/
+│   ├── postgres/
+│   ├── redis/
+│   ├── monitoring/
+│   ├── backups/
+│   └── deploy/
+│
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   ├── database/
+│   ├── security/
+│   ├── legal/
+│   ├── runbooks/
+│   └── product/
+│
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   ├── security/
+│   └── load/
+│
+└── .github/
+    ├── workflows/
+    ├── pull_request_template.md
+    └── ISSUE_TEMPLATE/
+1. Рекомендуемый стек
+Backend: Node.js + TypeScript
+Telegram: grammy или telegraf
+API: NestJS или Fastify
+Database: PostgreSQL
+ORM: Prisma
+Cache / locks / rate limits: Redis
+Queue: BullMQ
+Mini App: React + Vite + TypeScript
+UI: Tailwind + shadcn/ui
+Validation: Zod
+Testing: Vitest + Playwright
+Logging: Pino
+Monitoring: Prometheus + Grafana / Sentry
+Deploy: Docker + Docker Compose, позже Kubernetes
+2. Apps
+apps/client-bot/
+├── src/
+│   ├── main.ts
+│   ├── bot.ts
+│   ├── middlewares/
+│   ├── keyboards/
+│   ├── scenes/
+│   ├── handlers/
+│   │   ├── start.handler.ts
+│   │   ├── profile.handler.ts
+│   │   ├── market.handler.ts
+│   │   ├── deals.handler.ts
+│   │   ├── wallet.handler.ts
+│   │   ├── reviews.handler.ts
+│   │   ├── support.handler.ts
+│   │   ├── settings.handler.ts
+│   │   └── onboarding.handler.ts
+│   └── routes/
+└── package.json
+apps/admin-bot/
+├── src/
+│   ├── main.ts
+│   ├── admin-bot.ts
+│   ├── middlewares/
+│   │   ├── owner-only.middleware.ts
+│   │   ├── rbac.middleware.ts
+│   │   └── audit.middleware.ts
+│   ├── handlers/
+│   │   ├── users.admin.ts
+│   │   ├── moderation.admin.ts
+│   │   ├── disputes.admin.ts
+│   │   ├── finance.admin.ts
+│   │   ├── antifraud.admin.ts
+│   │   ├── ads.admin.ts
+│   │   ├── logs.admin.ts
+│   │   ├── admins.admin.ts
+│   │   ├── emergency.admin.ts
+│   │   └── settings.admin.ts
+│   └── keyboards/
+└── package.json
+apps/deal-room-bot/
+├── src/
+│   ├── main.ts
+│   ├── deal-room-bot.ts
+│   ├── state-machine/
+│   │   ├── deal.states.ts
+│   │   ├── deal.transitions.ts
+│   │   └── deal.guards.ts
+│   ├── handlers/
+│   │   ├── join.handler.ts
+│   │   ├── rules.handler.ts
+│   │   ├── completion.handler.ts
+│   │   ├── guarantor.handler.ts
+│   │   ├── scam-report.handler.ts
+│   │   ├── admin-join.handler.ts
+│   │   └── close.handler.ts
+│   └── keyboards/
+└── package.json
+apps/api/
+├── src/
+│   ├── main.ts
+│   ├── app.ts
+│   ├── modules/
+│   │   ├── auth/
+│   │   ├── users/
+│   │   ├── profiles/
+│   │   ├── market/
+│   │   ├── deals/
+│   │   ├── wallet/
+│   │   ├── reviews/
+│   │   ├── notifications/
+│   │   ├── miniapp/
+│   │   ├── support/
+│   │   ├── admin/
+│   │   └── health/
+│   └── middleware/
+└── package.json
+apps/mini-app/
+├── src/
+│   ├── main.tsx
+│   ├── app.tsx
+│   ├── routes/
+│   │   ├── home.tsx
+│   │   ├── market.tsx
+│   │   ├── reviews.tsx
+│   │   ├── notifications.tsx
+│   │   ├── profile.tsx
+│   │   ├── wallet.tsx
+│   │   ├── deals.tsx
+│   │   ├── support.tsx
+│   │   └── settings.tsx
+│   ├── components/
+│   ├── hooks/
+│   ├── api/
+│   ├── theme/
+│   └── security/
+└── package.json
+3. Packages
+packages/core/src/
+├── users/
+├── profiles/
+├── roles/
+├── deals/
+├── deal-rooms/
+├── applications/
+├── market/
+├── search/
+├── reviews/
+├── wallet/
+├── ledger/
+├── withdrawals/
+├── deposits/
+├── bans/
+├── antifraud/
+├── trust-score/
+├── ads/
+├── vip/
+├── referrals/
+├── achievements/
+├── promo-codes/
+├── notifications/
+├── support/
+├── onboarding/
+├── tests-system/
+├── legal/
+├── rules/
+├── settings/
+├── rate-limits/
+├── logs/
+├── archives/
+└── common/
+packages/security/src/
+├── callback-signing.ts
+├── nonce.service.ts
+├── idempotency.service.ts
+├── encryption.service.ts
+├── input-sanitizer.ts
+├── unicode-normalizer.ts
+├── telegram-initdata.ts
+├── permissions.guard.ts
+├── risk-guards.ts
+└── audit-context.ts
+packages/database/src/
+├── prisma.service.ts
+├── transaction.ts
+├── locks.ts
+├── repositories/
+│   ├── user.repo.ts
+│   ├── deal.repo.ts
+│   ├── wallet.repo.ts
+│   ├── ledger.repo.ts
+│   ├── review.repo.ts
+│   ├── fraud.repo.ts
+│   └── notification.repo.ts
+└── migrations-utils/
+4. Services
+services/workers/
+├── src/
+│   ├── main.ts
+│   ├── queues.ts
+│   ├── jobs/
+│   │   ├── telegram-send.job.ts
+│   │   ├── notification.job.ts
+│   │   ├── broadcast-feed.job.ts
+│   │   ├── vip-expire.job.ts
+│   │   ├── ad-rotation.job.ts
+│   │   ├── withdrawal.job.ts
+│   │   ├── fraud-check.job.ts
+│   │   ├── export-excel.job.ts
+│   │   ├── archive-deal.job.ts
+│   │   └── cleanup.job.ts
+│   └── dead-letter/
+└── package.json
+services/scheduler/
+├── src/
+│   ├── main.ts
+│   ├── cron/
+│   │   ├── deal-chat-expiration.cron.ts
+│   │   ├── invite-expiration.cron.ts
+│   │   ├── broadcast-rotation.cron.ts
+│   │   ├── vip-pin-rotation.cron.ts
+│   │   ├── ad-expiration.cron.ts
+│   │   ├── reconciliation.cron.ts
+│   │   ├── trust-score-recalc.cron.ts
+│   │   ├── rate-limit-cleanup.cron.ts
+│   │   └── backup-check.cron.ts
+│   └── locks/
+└── package.json
+5. Prisma / БД по доменам
+prisma/schema.prisma
+
+Лучше разделить файл схемы логически комментариями:
+
+// USERS
+// ROLES
+// PROFILES
+// ROBLOX VERIFICATION
+// DEALS
+// DEAL ROOMS
+// REVIEWS
+// WALLET / LEDGER
+// WITHDRAWALS
+// MARKET / LISTINGS
+// SEARCH
+// BROADCAST
+// VIP
+// ADS
+// REFERRALS
+// PROMO CODES
+// ACHIEVEMENTS
+// SUPPORT
+// NOTIFICATIONS
+// ADMIN BOT
+// LOGS / ARCHIVES
+// LEGAL
+// RATE LIMITS
+// SETTINGS
+
+Обязательное правило: баланс нельзя менять напрямую. Только через ledger-сервис.
+
+6. Документация внутри проекта
+docs/
+├── architecture/
+│   ├── 00-overview.md
+│   ├── 01-system-context.md
+│   ├── 02-services.md
+│   ├── 03-state-machines.md
+│   ├── 04-security-model.md
+│   └── 05-event-flows.md
+│
+├── product/
+│   ├── final-tz.md
+│   ├── user-flows.md
+│   ├── client-bot-map.md
+│   ├── admin-bot-map.md
+│   ├── mini-app-map.md
+│   └── buttons-and-keyboards.md
+│
+├── database/
+│   ├── schema-map.md
+│   ├── ledger-rules.md
+│   ├── migrations-guide.md
+│   └── indexes.md
+│
+├── security/
+│   ├── rbac.md
+│   ├── callback-security.md
+│   ├── antifraud.md
+│   ├── rate-limits.md
+│   ├── secrets.md
+│   └── incident-response.md
+│
+├── legal/
+│   ├── tos.md
+│   ├── privacy-policy.md
+│   ├── seller-agreement.md
+│   ├── guarantor-agreement.md
+│   └── moderator-agreement.md
+│
+└── runbooks/
+    ├── deploy.md
+    ├── rollback.md
+    ├── backup-restore.md
+    ├── telegram-floodwait.md
+    ├── payment-provider-down.md
+    └── sev1-incident.md
+7. Ветки Git
+main
+├── production only
+├── protected
+└── merge только через PR
+
+develop
+├── staging
+└── интеграция новых функций
+
+feature/*
+├── feature/deal-rooms
+├── feature/wallet-ledger
+├── feature/mini-app-reviews
+└── feature/admin-bot-rbac
+
+bugfix/*
+├── bugfix/callback-expired
+└── bugfix/review-pagination
+
+hotfix/*
+├── hotfix/withdrawal-freeze
+└── hotfix/admin-access
+
+release/*
+└── release/v0.1.0
+8. Порядок разработки по этапам
+Этап 0 — Foundation
+├── монорепозиторий
+├── Docker
+├── PostgreSQL
+├── Redis
+├── Prisma
+├── config/env
+├── logger
+├── i18n
+├── Telegram webhook gateway
+└── базовый CI
+
+Этап 1 — Users / Profiles / RBAC
+├── users
+├── roles
+├── profiles
+├── settings
+├── onboarding
+├── legal acceptances
+└── admin access
+
+Этап 2 — Deals Core
+├── applications
+├── deal state machine
+├── private deal rooms
+├── invite links
+├── participant validation
+├── completion flow
+└── archive basics
+
+Этап 3 — Wallet / Ledger
+├── wallets
+├── double-entry ledger
+├── holds
+├── escrow
+├── transaction idempotency
+└── reconciliation
+
+Этап 4 — Market
+├── games
+├── categories
+├── listings
+├── services
+├── search
+├── cart
+└── discovery
+
+Этап 5 — Reviews / Trust / Antifraud
+├── reviews
+├── ratings
+├── trust score
+├── risk score
+├── fraud signals
+└── linked accounts
+
+Этап 6 — Notifications / Support / Logs
+├── notification center
+├── support tickets
+├── admin log supergroup
+├── archives
+└── exports
+
+Этап 7 — Mini App
+├── auth initData
+├── profiles
+├── reviews
+├── market
+├── notifications
+├── settings
+└── wallet views
+
+Этап 8 — Monetization
+├── VIP
+├── ads
+├── promo codes
+├── referrals
+├── achievements
+└── broadcast channels
+
+Этап 9 — Production hardening
+├── rate limits
+├── monitoring
+├── backups
+├── CI/CD
+├── load tests
+├── security tests
+└── incident runbooks
+9. Главные правила порядка в коде
+1. Никакой бизнес-логики в handlers.
+2. Handler только принимает update и вызывает service.
+3. Все права проверяются в guards/services.
+4. Все деньги проходят только через ledger.
+5. Все критические действия имеют idempotency_key.
+6. Все callback-кнопки имеют TTL + nonce + подпись.
+7. Все state transitions сделки идут через state machine.
+8. Все пользовательские тексты проходят sanitizer.
+9. Все admin-действия логируются.
+10. Все workers идемпотентны.
+10. Пример naming convention
+user.service.ts
+user.repo.ts
+user.types.ts
+user.errors.ts
+user.policy.ts
+
+deal.service.ts
+deal-state-machine.ts
+deal-events.ts
+deal.repo.ts
+
+wallet-ledger.service.ts
+ledger-entry.repo.ts
+withdrawal.service.ts
+
+admin-rbac.service.ts
+admin-audit.service.ts
+11. Минимальный стартовый список env
+APP_ENV=development
+APP_NAME=shimm-marketplace
+
+OWNER_TELEGRAM_ID=
+CLIENT_BOT_TOKEN=
+ADMIN_BOT_TOKEN=
+DEAL_ROOM_BOT_TOKEN=
+
+DATABASE_URL=
+REDIS_URL=
+
+JWT_SECRET=
+CALLBACK_SIGNING_SECRET=
+TELEGRAM_WEBHOOK_SECRET=
+MINIAPP_SESSION_SECRET=
+ENCRYPTION_KEY=
+
+PUBLIC_MINIAPP_URL=
+PUBLIC_API_URL=
+
+LOG_LEVEL=debug
+12. Что положить в Cursor как главный ориентир
+docs/product/final-tz.md
+docs/architecture/00-overview.md
+docs/architecture/03-state-machines.md
+docs/security/04-security-model.md
+docs/database/ledger-rules.md
+
+И в корневой README.md написать:
+
+Этот проект запрещено писать как один огромный Telegram bot file.
+Любой модуль должен быть изолирован.
+Любое критическое действие должно проходить через service layer, RBAC, audit log, rate limit и idempotency.

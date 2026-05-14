@@ -1,0 +1,12 @@
+export { PrismaClient, DealState, UserStatus, ApplicationStatus } from "@prisma/client";
+export type { User } from "@prisma/client";
+export { getPrisma } from "./prisma.service.js";
+export * from "./transaction.js";
+export * from "./locks.js";
+export { UserRepo } from "./repositories/user.repo.js";
+export { DealRepo } from "./repositories/deal.repo.js";
+export { WalletRepo } from "./repositories/wallet.repo.js";
+export { LedgerRepo } from "./repositories/ledger.repo.js";
+export { ReviewRepo } from "./repositories/review.repo.js";
+export { FraudRepo } from "./repositories/fraud.repo.js";
+export { NotificationRepo } from "./repositories/notification.repo.js";
